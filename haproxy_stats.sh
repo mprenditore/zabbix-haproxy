@@ -172,6 +172,7 @@ MAP="
 61:rtime:0
 62:ttime:0
 0:acttot:0
+0:alljson:0
 "
 
 _STAT=$(echo -e "$MAP" | grep :${stat}:)
@@ -228,7 +229,7 @@ cache_gen() {
 }
 
 get_resource() {
-    local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep $1 "${CACHE_STATS_FILEPATH}")"
+    local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")"
     [[ -z ${_res} ]] && false
     echo ${_res}
 }
@@ -269,6 +270,28 @@ get_acttot () {
     echo "${_acttot}"
 }
 
+get_alljson () {
+    local _res=$(get_resource "$1")
+    [[ ! ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
+    debug "full_line resource stats: "${_res}
+    local _json_vals
+    local _stat
+    local _key
+    local _value
+    local _index
+    for s in $MAP; do
+        _index=${s%%:*}
+        [[ ${_index} -eq 0 ]] && continue
+        _stat_val=${s#*:}
+        _key=${_stat_val%:*}
+        _value=$(echo $_res | cut -d, -f${_index})
+        [[ -z "${_value}" ]] && _value=${_stat_val#*:}  # if empty value set it to Default val from MAP
+            _json_vals="${_json_vals} \"${_key}\":\"${_value}\""
+    done
+    _json_vals=$(echo ${_json_vals} | sed 's/\s/,/g')
+    echo "{\"haproxy_data\": {${_json_vals}}}"
+}
+
 # not sure why we'd need to split on backslash
 # left commented out as an example to override default get() method
 # status() {
@@ -287,6 +310,9 @@ then
     case ${stat} in
         "acttot")
             get_${stat} "${pxname}"
+            ;;
+        alljson)
+            get_${stat} "^${pxname},${svname},"
             ;;
         *) 
             get_${stat}
