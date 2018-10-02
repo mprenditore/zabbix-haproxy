@@ -228,7 +228,7 @@ cache_gen() {
     fi 200> "${cache_filepath}${FLOCK_SUFFIX}"
 }
 
-get_resource() {
+get_resources() {
     # $1: string to search for
     # $2: [OPTIONAL] file where to save resource extracted. (useful if multiple resources
     #     are returned because else the ${_res} var will be a single line)
@@ -246,7 +246,7 @@ get_resource() {
 # return default value if stat is ""
 get() {
   # $1: pxname/svname
-    local _res=$(get_resource "$1")
+    local _res=$(get_resources "$1")
     _res="$(echo $_res | cut -d, -f ${_INDEX})"
     if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
         echo "${_DEFAULT}"  
@@ -266,7 +266,7 @@ get_acttot () {
     local _acttot=0
     local tmpfile=`mktemp`
     local restmpfile=`mktemp`
-    get_resource "$1" ${restmpfile}
+    get_resources "$1" ${restmpfile}
     $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
     debug "TEMP_FILE_LS: $( ls -al ${tmpfile})"
     debug "TEMP_FILE: $( cat ${tmpfile})"
@@ -283,7 +283,7 @@ get_acttot () {
 }
 
 get_alljson () {
-    local _res=$(get_resource "$1")
+    local _res=$(get_resources "$1")
     local _json_vals
     local _stat
     local _key
