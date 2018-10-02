@@ -268,10 +268,6 @@ get_acttot () {
     local restmpfile=`mktemp`
     get_resources "$1" ${restmpfile}
     $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
-    debug "TEMP_FILE_LS: $( ls -al ${tmpfile})"
-    debug "TEMP_FILE: $( cat ${tmpfile})"
-    debug "RES_TEMP_FILE_LS: $( ls -al ${restmpfile})"
-    debug "RES_TEMP_FILE: $( cat ${restmpfile})"
     while read line; do
         debug "LINE: $line"
         if [[ "$(echo \"${line}\" | cut -d, -f 20 )" -eq "1" ]]; then
