@@ -230,7 +230,8 @@ cache_gen() {
 
 get_resource() {
     local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")"
-    [[ -z ${_res} ]] && false
+    [[ -z ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
+    debug "full_line resource stats: "${_res}
     echo ${_res}
 }
 
@@ -239,8 +240,6 @@ get_resource() {
 get() {
   # $1: pxname/svname
     local _res=$(get_resource "$1")
-    [[ ! ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
-    debug "full_line resource stats: "${_res}
     _res="$(echo $_res | cut -d, -f ${_INDEX})"
     if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
         echo "${_DEFAULT}"  
@@ -272,8 +271,6 @@ get_acttot () {
 
 get_alljson () {
     local _res=$(get_resource "$1")
-    [[ ! ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
-    debug "full_line resource stats: "${_res}
     local _json_vals
     local _stat
     local _key
