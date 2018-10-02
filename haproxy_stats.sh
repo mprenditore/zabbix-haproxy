@@ -229,7 +229,14 @@ cache_gen() {
 }
 
 get_resource() {
-    local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")"
+    # $1: string to search for
+    # $2: [OPTIONAL] file where to save resource extracted. (useful if multiple resources
+    #     are returned because else the ${_res} var will be a single line)
+    if [ -z $2 ]; then
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")"
+    else
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}" | tee $2)"
+    fi
     [[ -z ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
     debug "full_line resource stats: "${_res}
     echo ${_res}
@@ -258,14 +265,20 @@ get() {
 get_acttot () {
     local _acttot=0
     local tmpfile=`mktemp`
-    `grep "^${1}," ${CACHE_STATS_FILEPATH} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile}`
+    local restmpfile=`mktemp`
+    get_resource "$1" ${restmpfile}
+    $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
+    debug "TEMP_FILE_LS: $( ls -al ${tmpfile})"
+    debug "TEMP_FILE: $( cat ${tmpfile})"
+    debug "RES_TEMP_FILE_LS: $( ls -al ${restmpfile})"
+    debug "RES_TEMP_FILE: $( cat ${restmpfile})"
     while read line; do
         debug "LINE: $line"
         if [[ "$(echo \"${line}\" | cut -d, -f 20 )" -eq "1" ]]; then
             _acttot=$((_acttot+1))
         fi
     done < ${tmpfile}
-    rm -f ${tmpfile}
+    rm -f ${tmpfile} ${restmpfile}
     echo "${_acttot}"
 }
 
@@ -306,7 +319,7 @@ then
     debug "found custom query function"
     case ${stat} in
         "acttot")
-            get_${stat} "${pxname}"
+            get_${stat} "^${pxname},"
             ;;
         alljson)
             get_${stat} "^${pxname},${svname},"
