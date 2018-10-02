@@ -266,7 +266,7 @@ get_srvtot () {
     local _srvtot=0
     local tmpfile=`mktemp`
     local restmpfile=`mktemp`
-    get_resources "$1" ${restmpfile}
+    get_resources "$1" ${restmpfile} > /dev/null
     $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
     while read line; do
         debug "LINE: $line"
