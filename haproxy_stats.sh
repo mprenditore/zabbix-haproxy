@@ -279,6 +279,7 @@ get_acttot () {
 }
 
 get_alljson () {
+    local _pxname=$( echo ${1%%,*} | sed 's/\^//g')
     local _res=$(get_resources "$1")
     local _json_vals
     local _stat
@@ -294,6 +295,9 @@ get_alljson () {
         [[ -z "${_value}" ]] && _value=${_stat_val#*:}  # if empty value set it to Default val from MAP
             _json_vals="${_json_vals} \"${_key}\":\"${_value}\""
     done
+    _value=$(get_acttot "^${_pxname},")
+    _json_vals="${_json_vals} \"acttot\":\"${_value}\""
+
     _json_vals=$(echo ${_json_vals} | sed 's/\s/,/g')
     echo "{\"haproxy_data\": {${_json_vals}}}"
 }
