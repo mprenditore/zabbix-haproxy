@@ -171,7 +171,7 @@ MAP="
 60:ctime:0
 61:rtime:0
 62:ttime:0
-0:acttot:0
+0:srvtot:0
 0:alljson:0
 "
 
@@ -262,8 +262,8 @@ get() {
 
 # get number of total servers in "active" mode
 # this is needed to check the number of server there should be "UP"
-get_acttot () {
-    local _acttot=0
+get_srvtot () {
+    local _srvtot=0
     local tmpfile=`mktemp`
     local restmpfile=`mktemp`
     get_resources "$1" ${restmpfile}
@@ -271,11 +271,11 @@ get_acttot () {
     while read line; do
         debug "LINE: $line"
         if [[ "$(echo \"${line}\" | cut -d, -f 20 )" -eq "1" ]]; then
-            _acttot=$((_acttot+1))
+            _srvtot=$((_srvtot+1))
         fi
     done < ${tmpfile}
     rm -f ${tmpfile} ${restmpfile}
-    echo "${_acttot}"
+    echo "${_srvtot}"
 }
 
 get_alljson () {
@@ -295,8 +295,8 @@ get_alljson () {
         [[ -z "${_value}" ]] && _value=${_stat_val#*:}  # if empty value set it to Default val from MAP
             _json_vals="${_json_vals} \"${_key}\":\"${_value}\""
     done
-    _value=$(get_acttot "^${_pxname},")
-    _json_vals="${_json_vals} \"acttot\":\"${_value}\""
+    _value=$(get_srvtot "^${_pxname},")
+    _json_vals="${_json_vals} \"srvtot\":\"${_value}\""
 
     _json_vals=$(echo ${_json_vals} | sed 's/\s/,/g')
     echo "{\"haproxy_data\": {${_json_vals}}}"
@@ -318,7 +318,7 @@ if type get_${stat} >/dev/null 2>&1
 then
     debug "found custom query function"
     case ${stat} in
-        "acttot")
+        "srvtot")
             get_${stat} "^${pxname},"
             ;;
         alljson)
