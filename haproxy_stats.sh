@@ -88,6 +88,14 @@ fi
 # if we are NOT getting stats:
 #   check if we can read the stats cache file
 if [ "$GET_STATS" -eq 1 ]; then
+    if [ -e "$HAPROXY_SOCKET" ]; then
+        if [ ! -r "$HAPROXY_SOCKET" ]; then
+            fail 126 'ERROR: cannot read socket file'
+        fi
+    else
+        fail 126 "ERROR: HAProxy Socket file ($HAPROXY_SOCKET) doesn't exists"
+    fi
+
     if [ -e "$CACHE_STATS_FILEPATH" ]; then
         if [ ! -w "$CACHE_STATS_FILEPATH" ]; then
             fail 126 'ERROR: stats cache file exists, but is not writable'
