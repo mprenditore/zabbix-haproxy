@@ -70,6 +70,14 @@ get_stats() {
 	echo "$(query_stats)" | grep -v "^#"
 }
 
+if [ -e "$HAPROXY_SOCKET" ]; then
+    if [ ! -r "$HAPROXY_SOCKET" ]; then
+        fail 126 'ERROR: cannot read socket file'
+    fi
+else
+    fail 126 "ERROR: HAProxy Socket file ($HAPROXY_SOCKET) doesn't exists"
+fi
+
 [ -n "$2" ] && shift 1
 case $1 in
 	B*) END="BACKEND" ;;
@@ -83,7 +91,7 @@ case $1 in
 		echo -e '{\n\t"data":[\n'${serverlist#,}']}'
 		exit 0
 	;;
-	*) END="FRONTEND" ;;
+	*) fail 126 "ERROR: wrong resource type" ;;
 esac
 
 for frontend in $(get_stats | grep "$END" | cut -d, -f1 | uniq); do
