@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
-    <version>2.0</version>
-    <date>2015-05-27T10:32:05Z</date>
+    <version>3.0</version>
+    <date>2018-10-10T10:32:05Z</date>
     <groups>
         <group>
             <name>Templates</name>
@@ -249,7 +249,7 @@
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},BACKEND,qmax]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -341,7 +341,7 @@
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},BACKEND,smax]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -387,7 +387,7 @@
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},BACKEND,slim]</key>
-                            <delay>60</delay>
+                            <delay>3600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -1267,7 +1267,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},BACKEND,type]</key>
-                            <delay>60</delay>
+                            <delay>3600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>1</status>
@@ -1359,7 +1359,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},BACKEND,rate_max]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -3326,7 +3326,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#FRONTEND_NAME},FRONTEND,smax]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -3372,7 +3372,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#FRONTEND_NAME},FRONTEND,slim]</key>
-                            <delay>60</delay>
+                            <delay>3600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -3795,7 +3795,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#FRONTEND_NAME},FRONTEND,type]</key>
-                            <delay>60</delay>
+                            <delay>3600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>1</status>
@@ -3887,7 +3887,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#FRONTEND_NAME},FRONTEND,rate_lim]</key>
-                            <delay>60</delay>
+                            <delay>3600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -3933,7 +3933,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#FRONTEND_NAME},FRONTEND,rate_max]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -4301,7 +4301,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#FRONTEND_NAME},FRONTEND,req_rate_max]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>1</status>
@@ -5406,7 +5406,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},smax]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -5452,7 +5452,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},slim]</key>
-                            <delay>60</delay>
+                            <delay>3600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
@@ -6514,7 +6514,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},type]</key>
-                            <delay>60</delay>
+                            <delay>3600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>1</status>
@@ -6606,7 +6606,7 @@ Some other errors are:
                             <multiplier>0</multiplier>
                             <snmp_oid/>
                             <key>haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},rate_max]</key>
-                            <delay>60</delay>
+                            <delay>600</delay>
                             <history>90</history>
                             <trends>365</trends>
                             <status>0</status>
