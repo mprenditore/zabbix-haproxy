@@ -2135,7 +2135,18 @@ Some other errors are:
                             <logtimefmt/>
                         </item_prototype>
                     </item_prototypes>
-                    <trigger_prototypes/>
+                    <trigger_prototypes>
+                        <trigger_prototype>
+                            <expression>{Template App HAProxy:haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},BACKEND,status].str(UP)}=0</expression>
+                            <name>BACKEND {#BACKEND_NAME} is DOWN on {HOSTNAME}</name>
+                            <url/>
+                            <status>0</status>
+                            <priority>4</priority>
+                            <description>Alert when backend is not UP (usally, when no backend servers are available).</description>
+                            <type>0</type>
+                            <dependencies/>
+                        </trigger_prototype>
+                    </trigger_prototypes>
                     <graph_prototypes>
                         <graph_prototype>
                             <name>[{#BACKEND_NAME}] current queued requests</name>
@@ -7488,7 +7499,38 @@ L7STS   -&gt; layer 7 response error, for example HTTP 5xx</description>
                             <logtimefmt/>
                         </item_prototype>
                     </item_prototypes>
-                    <trigger_prototypes/>
+                    <trigger_prototypes>
+                        <trigger_prototype>
+                            <expression>{Template App HAProxy:haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},status].str(DOWN)}=1</expression>
+                            <name>Server {#SERVER_NAME} in backend {#BACKEND_NAME} is DOWN on {HOSTNAME}</name>
+                            <url/>
+                            <status>0</status>
+                            <priority>2</priority>
+                            <description>Warning when backend server is not DOWN.</description>
+                            <type>0</type>
+                            <dependencies/>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <expression>{Template App HAProxy:haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},status].str(NOLB)}=1</expression>
+                            <name>Server {#SERVER_NAME} in backend {#BACKEND_NAME} is NOLB on {HOSTNAME}</name>
+                            <url/>
+                            <status>0</status>
+                            <priority>2</priority>
+                            <description>Backend server has status NOLB - it is working, but does not participate in loadbalancing due to some reasons or errors.</description>
+                            <type>0</type>
+                            <dependencies/>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <expression>{Template App HAProxy:haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},status].str(MAINT)}=1 or  {Template App HAProxy:haproxy.stats[{$HAPROXY_SOCK},{#BACKEND_NAME},{#SERVER_NAME},status].str(DRAIN)}=1</expression>
+                            <name>Server {#SERVER_NAME} in backend {#BACKEND_NAME} is in MAINT state on {HOSTNAME}</name>
+                            <url/>
+                            <status>1</status>
+                            <priority>1</priority>
+                            <description>Information when backend server is in MAINTENANCE or DRAIN mode.</description>
+                            <type>0</type>
+                            <dependencies/>
+                        </trigger_prototype>
+                    </trigger_prototypes>
                     <graph_prototypes>
                         <graph_prototype>
                             <name>[{#BACKEND_NAME}/{#SERVER_NAME}] backend server current queued requests</name>
