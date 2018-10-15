@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>3.0</version>
-    <date>2018-10-15T14:05:13Z</date>
+    <date>2018-10-15T20:55:17Z</date>
     <groups>
         <group>
             <name>Templates</name>
@@ -4370,7 +4370,7 @@ Some other errors are:
                             <application_prototypes/>
                         </item_prototype>
                         <item_prototype>
-                            <name>[{#FRONTEND_NAME}] requests total</name>
+                            <name>[{#FRONTEND_NAME}] calculated requests per sec</name>
                             <type>0</type>
                             <snmp_community/>
                             <multiplier>0</multiplier>
@@ -4379,11 +4379,11 @@ Some other errors are:
                             <delay>60</delay>
                             <history>90</history>
                             <trends>365</trends>
-                            <status>1</status>
-                            <value_type>3</value_type>
+                            <status>0</status>
+                            <value_type>0</value_type>
                             <allowed_hosts/>
-                            <units>req</units>
-                            <delta>0</delta>
+                            <units>req/s</units>
+                            <delta>1</delta>
                             <snmpv3_contextname/>
                             <snmpv3_securityname/>
                             <snmpv3_securitylevel>0</snmpv3_securitylevel>
@@ -4402,7 +4402,7 @@ Some other errors are:
                             <publickey/>
                             <privatekey/>
                             <port/>
-                            <description>total number of HTTP requests received</description>
+                            <description>number of requests received by frontend, divided per number of second since last check - return req/sec average from last minute.</description>
                             <inventory_link>0</inventory_link>
                             <applications>
                                 <application>
@@ -5103,7 +5103,7 @@ Some other errors are:
                             </graph_items>
                         </graph_prototype>
                         <graph_prototype>
-                            <name>[{#FRONTEND_NAME}] requests total</name>
+                            <name>[{#FRONTEND_NAME}] calculated req/sec (avg for a minute)</name>
                             <width>900</width>
                             <height>200</height>
                             <yaxismin>0.0000</yaxismin>
@@ -5114,15 +5114,15 @@ Some other errors are:
                             <show_legend>1</show_legend>
                             <show_3d>0</show_3d>
                             <percent_left>0.0000</percent_left>
-                            <percent_right>95.0000</percent_right>
-                            <ymin_type_1>0</ymin_type_1>
+                            <percent_right>0.0000</percent_right>
+                            <ymin_type_1>1</ymin_type_1>
                             <ymax_type_1>0</ymax_type_1>
                             <ymin_item_1>0</ymin_item_1>
                             <ymax_item_1>0</ymax_item_1>
                             <graph_items>
                                 <graph_item>
                                     <sortorder>0</sortorder>
-                                    <drawtype>0</drawtype>
+                                    <drawtype>1</drawtype>
                                     <color>C80000</color>
                                     <yaxisside>1</yaxisside>
                                     <calc_fnc>2</calc_fnc>
