@@ -10,6 +10,7 @@ else
   then
     HAPROXY_STATS_IP="$1"
     QUERYING_METHOD="TCP"
+    NC_BIN="$(which nc)"
     shift 1
   fi
 fi
@@ -33,7 +34,6 @@ CACHE_INFO_EXPIRATION=1  # in minutes ## unused
 STATS_LOG_FILE="/var/tmp/haproxy_stat.log"
 GET_STATS=1  # when you update stats cache outsise of the script
 SOCAT_BIN="$(which socat)"
-NC_BIN="$(which nc)"
 FLOCK_BIN="$(which flock)"
 FLOCK_WAIT=15 # maximum number of seconds that "flock" waits for acquiring a lock
 FLOCK_SUFFIX='.lock'
