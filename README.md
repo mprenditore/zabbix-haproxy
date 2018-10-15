@@ -36,7 +36,7 @@ This repo contains everything you need to discover and monitor HAProxy frontends
 Include=/etc/zabbix/zabbix_agentd.d/
 ```
 * Place `haproxy_discovery.sh`, `haproxy_stats.sh` and `haproxy_zbx.conf` into `/usr/local/bin/` directory (or a custom one, but in that case please update the `userparameter_haproxy.conf` with the correct path for the executables) and make sure that the scripts are executable (`sudo chmod +x /usr/local/bin/haproxy_{discovery,stats}.sh`)
-* Import appropriate `haproxy_zbx_v2_template.xml` or `haproxy_zbx_v3_template.xml` or `haproxy_zbx_v3.4_template.xml` template from the `templates` folder via Zabbix Web UI interface (provided by `zabbix-frontend-php` package)
+* Import appropriate template file from the `templates` folder via Zabbix Web UI interface (provided by `zabbix-frontend-php` package)
 * Configure HAProxy control socket
   - [Configure HAProxy](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#9.2) to listen on `/var/run/haproxy/info.sock`
   - or set custom socket path in checks (set `{$HAPROXY_SOCK}` template macro to your custom socket path)
