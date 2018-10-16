@@ -15,9 +15,9 @@ HAPROXY_SOCKET="/var/run/haproxy/info.sock"
 HAPROXY_STATS_IP=""  # set it to the HAProxy IP to use TCP instead SOCKET
 QUERYING_METHOD="SOCKET"
 CACHE_STATS_FILEPATH="/var/tmp/haproxy_stat.cache"
-CACHE_STATS_EXPIRATION=1  # in minutes
-CACHE_INFO_FILEPATH="/var/tmp/haproxy_info.cache"  ## unused
-CACHE_INFO_EXPIRATION=1  # in minutes ## unused
+CACHE_STATS_EXPIRATION=60  # in seconds
+CACHE_INFO_FILEPATH="/var/tmp/haproxy_info.cache"  ## unused ATM
+CACHE_INFO_EXPIRATION=60  # in seconds ## unused ATM
 STATS_LOG_FILE="/var/tmp/haproxy_stat.log"
 GET_STATS=1  # when you update stats cache outsise of the script
 SOCAT_BIN="$(which socat)"
@@ -215,11 +215,11 @@ cache_gen() {
         cache_expiration=$CACHE_INFO_EXPIRATION
     fi
     cache_filemtime=$(stat -c '%Y' "${cache_filepath}" 2> /dev/null)
-    if [[ $((cache_filemtime+60*cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
-        debug "${cache_type} file found, results are at most ${cache_expiration} minutes stale..."
+    if [[ $((cache_filemtime+cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
+        debug "${cache_type} file found, results are at most ${cache_expiration} seconds stale..."
     elif "${FLOCK_BIN}" --exclusive --wait "${FLOCK_WAIT}" 200; then
         cache_filemtime=$(stat -c '%Y' "${cache_filepath}" 2> /dev/null)
-        if [[ $((cache_filemtime+60*cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
+        if [[ $((cache_filemtime+cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
             debug "${cache_type} file found, results have just been updated by another process..."
         else
             debug "${cache_type} file expired/empty/not_found, querying haproxy to refresh it"
