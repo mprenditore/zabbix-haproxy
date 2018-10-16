@@ -1,9 +1,8 @@
 #!/bin/bash
 #
 # Get list of Frontends and Backends from HAPROXY
-# Example: ./haproxy_discovery.sh [/var/run/haproxy/info.sock] FRONTEND|BACKEND|SERVERS
-# First argument is optional and should be used to set location of your HAPROXY socket
-# Second argument is should be either FRONTEND, BACKEND or SERVERS, will default to FRONTEND if not set
+# Example: ./haproxy_discovery.sh FRONTEND|BACKEND|SERVERS
+# First argument is should be either FRONTEND, BACKEND or SERVERS, will default to FRONTEND if not set
 #
 # !! Make sure the user running this script has Read/Write permissions to that socket !!
 #

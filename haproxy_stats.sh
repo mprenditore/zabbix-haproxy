@@ -245,7 +245,7 @@ get_resources() {
 # get requested stat from cache file using INDEX offset defined in MAP
 # return default value if stat is ""
 get() {
-  # $1: pxname/svname
+    # $1: pxname/svname
     local _res=$(get_resources "$1")
     _res="$(echo $_res | cut -d, -f ${_INDEX})"
     if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
@@ -302,18 +302,11 @@ get_alljson () {
     echo "{\"haproxy_data\": {${_json_vals}}}"
 }
 
-# not sure why we'd need to split on backslash
-# left commented out as an example to override default get() method
-# status() {
-#   get "^${pxname},${svnamem}," $stat | cut -d\  -f1
-# }
-
 # get_stats
 cache_gen stat
 
 # this allows for overriding default method of getting stats
 # name a function by stat name for additional processing, custom returns, etc.
-
 if type get_${stat} >/dev/null 2>&1
 then
     debug "found custom query function"
