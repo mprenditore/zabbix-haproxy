@@ -1,19 +1,6 @@
 #!/bin/bash
 set -o pipefail
 
-if [[ "$1" = /* ]]
-then
-  HAPROXY_SOCKET="$1"
-  shift 1
-else
-  if [[ "$1" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5} ]];
-  then
-    HAPROXY_STATS_IP="$1"
-    QUERYING_METHOD="TCP"
-    shift 1
-  fi
-fi
-
 pxname="$1"
 svname="$2"
 stat="$3"
@@ -25,15 +12,15 @@ CONF_FILE="${SCRIPT_DIR}/haproxy_zbx.conf"
 DEBUG=0
 DEBUG_ONLY_LOG=0  # only debug in logfile
 HAPROXY_SOCKET="/var/run/haproxy/info.sock"
+HAPROXY_STATS_IP=""  # set it to the HAProxy IP to use TCP instead SOCKET
 QUERYING_METHOD="SOCKET"
 CACHE_STATS_FILEPATH="/var/tmp/haproxy_stat.cache"
-CACHE_STATS_EXPIRATION=1  # in minutes
-CACHE_INFO_FILEPATH="/var/tmp/haproxy_info.cache"  ## unused
-CACHE_INFO_EXPIRATION=1  # in minutes ## unused
+CACHE_STATS_EXPIRATION=60  # in seconds
+CACHE_INFO_FILEPATH="/var/tmp/haproxy_info.cache"  ## unused ATM
+CACHE_INFO_EXPIRATION=60  # in seconds ## unused ATM
 STATS_LOG_FILE="/var/tmp/haproxy_stat.log"
 GET_STATS=1  # when you update stats cache outsise of the script
 SOCAT_BIN="$(which socat)"
-NC_BIN="$(which nc)"
 FLOCK_BIN="$(which flock)"
 FLOCK_WAIT=15 # maximum number of seconds that "flock" waits for acquiring a lock
 FLOCK_SUFFIX='.lock'
@@ -42,6 +29,11 @@ CUR_TIMESTAMP="$(date '+%s')"
 # constants override
 if [ -f ${CONF_FILE} ]; then
     source ${CONF_FILE}
+fi
+
+if [[ "$HAPROXY_STATS_IP" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5} ]]; then
+    QUERYING_METHOD="TCP"
+    NC_BIN="$(which nc)"
 fi
 
 debug() {
@@ -88,6 +80,14 @@ fi
 # if we are NOT getting stats:
 #   check if we can read the stats cache file
 if [ "$GET_STATS" -eq 1 ]; then
+    if [ -e "$HAPROXY_SOCKET" ]; then
+        if [ ! -r "$HAPROXY_SOCKET" ]; then
+            fail 126 'ERROR: cannot read socket file'
+        fi
+    else
+        fail 126 "ERROR: HAProxy Socket file ($HAPROXY_SOCKET) doesn't exists"
+    fi
+
     if [ -e "$CACHE_STATS_FILEPATH" ]; then
         if [ ! -w "$CACHE_STATS_FILEPATH" ]; then
             fail 126 'ERROR: stats cache file exists, but is not writable'
@@ -171,7 +171,8 @@ MAP="
 60:ctime:0
 61:rtime:0
 62:ttime:0
-0:acttot:0
+0:srvtot:0
+0:alljson:0
 "
 
 _STAT=$(echo -e "$MAP" | grep :${stat}:)
@@ -214,11 +215,11 @@ cache_gen() {
         cache_expiration=$CACHE_INFO_EXPIRATION
     fi
     cache_filemtime=$(stat -c '%Y' "${cache_filepath}" 2> /dev/null)
-    if [[ $((cache_filemtime+60*cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
-        debug "${cache_type} file found, results are at most ${cache_expiration} minutes stale..."
+    if [[ $((cache_filemtime+cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
+        debug "${cache_type} file found, results are at most ${cache_expiration} seconds stale..."
     elif "${FLOCK_BIN}" --exclusive --wait "${FLOCK_WAIT}" 200; then
         cache_filemtime=$(stat -c '%Y' "${cache_filepath}" 2> /dev/null)
-        if [[ $((cache_filemtime+60*cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
+        if [[ $((cache_filemtime+cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
             debug "${cache_type} file found, results have just been updated by another process..."
         else
             debug "${cache_type} file expired/empty/not_found, querying haproxy to refresh it"
@@ -227,19 +228,25 @@ cache_gen() {
     fi 200> "${cache_filepath}${FLOCK_SUFFIX}"
 }
 
-get_resource() {
-    local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep $1 "${CACHE_STATS_FILEPATH}")"
-    [[ -z ${_res} ]] && false
+get_resources() {
+    # $1: string to search for
+    # $2: [OPTIONAL] file where to save resource extracted. (useful if multiple resources
+    #     are returned because else the ${_res} var will be a single line)
+    if [ -z $2 ]; then
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")"
+    else
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}" | tee $2)"
+    fi
+    [[ -z ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
+    debug "full_line resource stats: "${_res}
     echo ${_res}
 }
 
 # get requested stat from cache file using INDEX offset defined in MAP
 # return default value if stat is ""
 get() {
-  # $1: pxname/svname
-    local _res=$(get_resource "$1")
-    [[ ! ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
-    debug "full_line resource stats: "${_res}
+    # $1: pxname/svname
+    local _res=$(get_resources "$1")
     _res="$(echo $_res | cut -d, -f ${_INDEX})"
     if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
         echo "${_DEFAULT}"  
@@ -255,38 +262,60 @@ get() {
 
 # get number of total servers in "active" mode
 # this is needed to check the number of server there should be "UP"
-get_acttot () {
-    local _acttot=0
+get_srvtot () {
+    local _srvtot=0
     local tmpfile=`mktemp`
-    `grep "^${1}," ${CACHE_STATS_FILEPATH} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile}`
+    local restmpfile=`mktemp`
+    get_resources "$1" ${restmpfile} > /dev/null
+    $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
     while read line; do
         debug "LINE: $line"
         if [[ "$(echo \"${line}\" | cut -d, -f 20 )" -eq "1" ]]; then
-            _acttot=$((_acttot+1))
+            _srvtot=$((_srvtot+1))
         fi
     done < ${tmpfile}
-    rm -f ${tmpfile}
-    echo "${_acttot}"
+    rm -f ${tmpfile} ${restmpfile}
+    echo "${_srvtot}"
 }
 
-# not sure why we'd need to split on backslash
-# left commented out as an example to override default get() method
-# status() {
-#   get "^${pxname},${svnamem}," $stat | cut -d\  -f1
-# }
+get_alljson () {
+    local _pxname=$( echo ${1%%,*} | sed 's/\^//g')
+    local _res=$(get_resources "$1")
+    local _json_vals
+    local _stat
+    local _key
+    local _value
+    local _index
+    for s in $MAP; do
+        _index=${s%%:*}
+        [[ ${_index} -eq 0 ]] && continue
+        _stat_val=${s#*:}
+        _key=${_stat_val%:*}
+        _value=$(echo $_res | cut -d, -f${_index})
+        [[ -z "${_value}" ]] && _value=${_stat_val#*:}  # if empty value set it to Default val from MAP
+            _json_vals="${_json_vals} \"${_key}\":\"${_value}\""
+    done
+    _value=$(get_srvtot "^${_pxname},")
+    _json_vals="${_json_vals} \"srvtot\":\"${_value}\""
+
+    _json_vals=$(echo ${_json_vals} | sed 's/\s/,/g')
+    echo "{\"haproxy_data\": {${_json_vals}}}"
+}
 
 # get_stats
 cache_gen stat
 
 # this allows for overriding default method of getting stats
 # name a function by stat name for additional processing, custom returns, etc.
-
 if type get_${stat} >/dev/null 2>&1
 then
     debug "found custom query function"
     case ${stat} in
-        "acttot")
-            get_${stat} "${pxname}"
+        "srvtot")
+            get_${stat} "^${pxname},"
+            ;;
+        alljson)
+            get_${stat} "^${pxname},${svname},"
             ;;
         *) 
             get_${stat}

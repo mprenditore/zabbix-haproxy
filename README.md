@@ -12,6 +12,7 @@ This repo contains everything you need to discover and monitor HAProxy frontends
 
 ### Latest / Changelog
 
+* [10/11/2018]: added support for dependant items to reduce the load on the monitored machines for Zabbix v3.4+
 * [01/20/2017]: replaced single XML template with two - one for Zabbix v2 and another for v3
 * [09/08/2015]: now all stats are retrieved via `haproxy_stats.sh` script, which caches the stats for 5 minutes (by default) to avoid hitting HAProxy stats socket too much.
 
@@ -34,13 +35,11 @@ This repo contains everything you need to discover and monitor HAProxy frontends
 # Default:
 Include=/etc/zabbix/zabbix_agentd.d/
 ```
-* Place `haproxy_discovery.sh` into `/usr/local/bin/` directory and make sure it's executable (`sudo chmod +x /usr/local/bin/haproxy_discovery.sh`)
-* Import appropriate `haproxy_zbx_v2_template.xml` or `haproxy_zbx_v3_template.xml` template via Zabbix Web UI interface (provided by `zabbix-frontend-php` package)
+* Place `haproxy_discovery.sh`, `haproxy_stats.sh` and `haproxy_zbx.conf` into `/usr/local/bin/` directory (or a custom one, but in that case please update the `userparameter_haproxy.conf` with the correct path for the executables) and make sure that the scripts are executable (`sudo chmod +x /usr/local/bin/haproxy_{discovery,stats}.sh`)
+* Import appropriate template file from the `templates` folder via Zabbix Web UI interface (provided by `zabbix-frontend-php` package)
 * Configure HAProxy control socket
   - [Configure HAProxy](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#9.2) to listen on `/var/run/haproxy/info.sock`
-  - or set custom socket path in checks (set `{$HAPROXY_SOCK}` template macro to your custom socket path)
-  - or update `userparameter_haproxy.conf` and `haproxy_discovery.sh` with your socket path
-* Customize your HAProxy config file location via `{$HAPROXY_CONFIG}` template macro, if necessary
+  - or which ever sock file you prefer and change it accordly in the `haproxy_zbx.conf`
 ```
 # haproxy.conf snippet
 # haproxy read-only non-admin socket
@@ -86,19 +85,18 @@ anapsix@lb1:~$ sudo zabbix_agentd -t haproxy.list.discovery[SERVERS]
 $1 is a path to haproxy socket
 $2 is FRONTEND or BACKEND or SERVERS
 
-# /usr/local/bin/haproxy_discovery.sh /var/run/haproxy/info.sock FRONTEND    # second argument is optional
-# /usr/local/bin/haproxy_discovery.sh /var/run/haproxy/info.sock BACKEND     # second argument is optional
-# /usr/local/bin/haproxy_discovery.sh /var/run/haproxy/info.sock SERVERS     # second argument is optional
+# /usr/local/bin/haproxy_discovery.sh FRONTEND
+# /usr/local/bin/haproxy_discovery.sh BACKEND
+# /usr/local/bin/haproxy_discovery.sh SERVERS
 ```
 
 #### haproxy_stats.sh script
 ```
-## Usage: haproxy_stats.sh $1 $2 $3 $4
-### $1 is a path to haproxy socket - optional, defaults to /var/run/haproxy/info.sock
-### $2 is a name of the backend, as set in haproxy.cfg
-### $3 is a name of the server, as set in haproxy.cfg
-### $4 is a stat as references by HAProxy terminology
-# haproxy_stats.sh /var/run/haproxy/info.sock www-backend www01 status
+## Usage: haproxy_stats.sh $1 $2 $3
+### $1 is a name of the backend, as set in haproxy.cfg
+### $2 is a name of the server, as set in haproxy.cfg
+### $3 is a stat as references by HAProxy terminology
+# haproxy_stats.sh www-backend www01 status
 # haproxy_stats.sh www-backend BACKEND status
 # haproxy_stats.sh https-frontend FRONTEND status
 ```
@@ -109,12 +107,11 @@ $2 is FRONTEND or BACKEND or SERVERS
 
 #### Stats
 ```
-## Bytes In:      echo "show stat" | socat $1 stdio | grep "^$2,$3" | cut -d, -f9
-## Bytes Out:     echo "show stat" | socat $1 stdio | grep "^$2,$3" | cut -d, -f10
-## Session Rate:  echo "show stat" | socat $1 stdio | grep "^$2,$3" | cut -d, -f5
-### $1 is a path to haproxy socket
-### $2 is a name of the backend, as set in haproxy.cfg
-### $3 is a name of the server, as set in haproxy.cfg
+## Bytes In:      echo "show stat" | socat [path/to/haproxy_sock_file] stdio | grep "^$1,$2" | cut -d, -f9
+## Bytes Out:     echo "show stat" | socat [path/to/haproxy_sock_file] stdio | grep "^$1,$2" | cut -d, -f10
+## Session Rate:  echo "show stat" | socat [path/to/haproxy_sock_file] stdio | grep "^$1,$2" | cut -d, -f5
+### $1 is a name of the backend, as set in haproxy.cfg
+### $2 is a name of the server, as set in haproxy.cfg
 # echo "show stat" | socat /var/run/haproxy/info.sock stdio | grep "^www-backend,www01" | cut -d, -f9
 # echo "show stat" | socat /var/run/haproxy/info.sock stdio | grep "^www-backend,BACKEND" | cut -d, -f10
 # echo "show stat" | socat /var/run/haproxy/info.sock stdio | grep "^https-frontend,FRONTEND" | cut -d, -f5
