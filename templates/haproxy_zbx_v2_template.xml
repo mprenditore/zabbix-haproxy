@@ -8599,10 +8599,6 @@ L7STS   -&gt; layer 7 response error, for example HTTP 5xx</description>
                     <macro>{$HAPROXY_CONFIG}</macro>
                     <value>/etc/haproxy/haproxy.cfg</value>
                 </macro>
-                <macro>
-                    <macro>{$HAPROXY_SOCK}</macro>
-                    <value>/var/run/haproxy/info.sock</value>
-                </macro>
             </macros>
             <templates/>
             <screens/>
