@@ -12,6 +12,7 @@ This repo contains everything you need to discover and monitor HAProxy frontends
 
 ### Latest / Changelog
 
+* [10/16/2018]: removed {$HAPROXY_SOCK} macro (also thanks to @jacentemu)
 * [10/11/2018]: added support for dependant items to reduce the load on the monitored machines for Zabbix v3.4+
 * [01/20/2017]: replaced single XML template with two - one for Zabbix v2 and another for v3
 * [09/08/2015]: now all stats are retrieved via `haproxy_stats.sh` script, which caches the stats for 5 minutes (by default) to avoid hitting HAProxy stats socket too much.
