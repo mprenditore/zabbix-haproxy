@@ -1,20 +1,6 @@
 #!/bin/bash
 set -o pipefail
 
-if [[ "$1" = /* ]]
-then
-  HAPROXY_SOCKET="$1"
-  shift 1
-else
-  if [[ "$1" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5} ]];
-  then
-    HAPROXY_STATS_IP="$1"
-    QUERYING_METHOD="TCP"
-    NC_BIN="$(which nc)"
-    shift 1
-  fi
-fi
-
 pxname="$1"
 svname="$2"
 stat="$3"
@@ -26,6 +12,7 @@ CONF_FILE="${SCRIPT_DIR}/haproxy_zbx.conf"
 DEBUG=0
 DEBUG_ONLY_LOG=0  # only debug in logfile
 HAPROXY_SOCKET="/var/run/haproxy/info.sock"
+HAPROXY_STATS_IP=""  # set it to the HAProxy IP to use TCP instead SOCKET
 QUERYING_METHOD="SOCKET"
 CACHE_STATS_FILEPATH="/var/tmp/haproxy_stat.cache"
 CACHE_STATS_EXPIRATION=1  # in minutes
@@ -42,6 +29,11 @@ CUR_TIMESTAMP="$(date '+%s')"
 # constants override
 if [ -f ${CONF_FILE} ]; then
     source ${CONF_FILE}
+fi
+
+if [[ "$HAPROXY_STATS_IP" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5} ]]; then
+    QUERYING_METHOD="TCP"
+    NC_BIN="$(which nc)"
 fi
 
 debug() {
