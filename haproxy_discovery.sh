@@ -1,9 +1,8 @@
 #!/bin/bash
 #
 # Get list of Frontends and Backends from HAPROXY
-# Example: ./haproxy_discovery.sh [/var/run/haproxy/info.sock] FRONTEND|BACKEND|SERVERS
-# First argument is optional and should be used to set location of your HAPROXY socket
-# Second argument is should be either FRONTEND, BACKEND or SERVERS, will default to FRONTEND if not set
+# Example: ./haproxy_discovery.sh FRONTEND|BACKEND|SERVERS
+# First argument is should be either FRONTEND, BACKEND or SERVERS, will default to FRONTEND if not set
 #
 # !! Make sure the user running this script has Read/Write permissions to that socket !!
 #
@@ -46,11 +45,8 @@ fail() {
   exit $_exit_code
 }
 
-[ -n "$1" ] && echo $1 | grep -q ^/ && HAPROXY_SOCK="$(echo $1 | tr -d '\040\011\012\015')"
-
-if [[ "$1" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5} ]];
+if [[ "$HAPROXY_STATS_IP" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5} ]];
 then
-    HAPROXY_STATS_IP="$1"
     QUERYING_METHOD="TCP"
 fi
 
@@ -70,7 +66,14 @@ get_stats() {
 	echo "$(query_stats)" | grep -v "^#"
 }
 
-[ -n "$2" ] && shift 1
+if [ -e "$HAPROXY_SOCKET" ]; then
+    if [ ! -r "$HAPROXY_SOCKET" ]; then
+        fail 126 'ERROR: cannot read socket file'
+    fi
+else
+    fail 126 "ERROR: HAProxy Socket file ($HAPROXY_SOCKET) doesn't exists"
+fi
+
 case $1 in
 	B*) END="BACKEND" ;;
 	F*) END="FRONTEND" ;;
@@ -83,7 +86,7 @@ case $1 in
 		echo -e '{\n\t"data":[\n'${serverlist#,}']}'
 		exit 0
 	;;
-	*) END="FRONTEND" ;;
+	*) fail 126 "ERROR: wrong resource type" ;;
 esac
 
 for frontend in $(get_stats | grep "$END" | cut -d, -f1 | uniq); do
