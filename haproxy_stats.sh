@@ -313,16 +313,16 @@ then
     debug "found custom query function"
     case ${stat} in
         "srvtot")
-            get_${stat} "^${pxname},"
+            get_${stat} "^${pxname}," || exit 128
             ;;
         alljson)
-            get_${stat} "^${pxname},${svname},"
+            get_${stat} "^${pxname},${svname}," || exit 128
             ;;
         *) 
-            get_${stat}
+            get_${stat} || exit 128
             ;;
     esac
 else
     debug "using default get() method"
-    get "^${pxname},${svname},"
+    get "^${pxname},${svname}," || exit 128
 fi
