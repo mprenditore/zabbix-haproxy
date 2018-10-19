@@ -38,9 +38,10 @@ fi
 
 debug() {
     [[ "${DEBUG}" -eq 1 ]] || return  # return immediately if debug is disabled
-    echo "DEBUG: $@" >> ${STATS_LOG_FILE}
+    local T=$(date +"%Y-%m-%d_%H:%M:%S.%N")
+    echo "$T DEBUG: $@" >> ${STATS_LOG_FILE}
     [[ "${DEBUG_ONLY_LOG}" -ne 1 ]] || return
-    echo >&2 "DEBUG: $@"
+    echo >&2 "$T DEBUG: $@"
 }
 
 fail() {
