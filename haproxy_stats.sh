@@ -234,9 +234,9 @@ get_resources() {
     # $2: [OPTIONAL] file where to save resource extracted. (useful if multiple resources
     #     are returned because else the ${_res} var will be a single line)
     if [ -z $2 ]; then
-        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")"
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")" || fail 128
     else
-        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}" | tee $2)"
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}" | tee $2 > /dev/null)" || fail 128
     fi
     [[ -z ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
     debug "full_line resource stats: "${_res}
@@ -267,7 +267,7 @@ get_srvtot () {
     local _srvtot=0
     local tmpfile=`mktemp`
     local restmpfile=`mktemp`
-    get_resources "$1" ${restmpfile} > /dev/null || exit 127
+    get_resources "$1" ${restmpfile} || exit 127
     $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
     while read line; do
         debug "LINE: $line"
@@ -313,16 +313,16 @@ then
     debug "found custom query function"
     case ${stat} in
         "srvtot")
-            get_${stat} "^${pxname}," || exit 128
+            get_${stat} "^${pxname},"
             ;;
         alljson)
-            get_${stat} "^${pxname},${svname}," || exit 128
+            get_${stat} "^${pxname},${svname},"
             ;;
         *) 
-            get_${stat} || exit 128
+            get_${stat}
             ;;
     esac
 else
     debug "using default get() method"
-    get "^${pxname},${svname}," || exit 128
+    get "^${pxname},${svname},"
 fi
