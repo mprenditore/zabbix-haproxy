@@ -247,7 +247,7 @@ get_resources() {
 # return default value if stat is ""
 get() {
     # $1: pxname/svname
-    local _res=$(get_resources "$1")
+    local _res=$(get_resources "$1") || exit 127
     _res="$(echo $_res | cut -d, -f ${_INDEX})"
     if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
         echo "${_DEFAULT}"  
@@ -267,7 +267,7 @@ get_srvtot () {
     local _srvtot=0
     local tmpfile=`mktemp`
     local restmpfile=`mktemp`
-    get_resources "$1" ${restmpfile} > /dev/null
+    get_resources "$1" ${restmpfile} > /dev/null || exit 127
     $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
     while read line; do
         debug "LINE: $line"
@@ -281,7 +281,7 @@ get_srvtot () {
 
 get_alljson () {
     local _pxname=$( echo ${1%%,*} | sed 's/\^//g')
-    local _res=$(get_resources "$1")
+    local _res=$(get_resources "$1") || exit 127
     local _json_vals
     local _stat
     local _key
