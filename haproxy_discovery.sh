@@ -14,7 +14,7 @@ SCRIPT_DIR=`dirname $0`
 CONF_FILE="${SCRIPT_DIR}/haproxy_zbx.conf"
 
 # default constant values - can be overridden by the $CONF_FILE
-HAPROXY_SOCK="/var/run/haproxy/info.sock"
+HAPROXY_SOCKET="/var/run/haproxy/info.sock"
 DEBUG=0
 DEBUG_ONLY_LOG=1
 DISCOVERY_LOG_FILE="/var/tmp/haproxy_discovery.log"
@@ -27,9 +27,10 @@ fi
 
 debug() {
     [[ "${DEBUG}" -eq 1 ]] || return  # return immediately if debug is disabled
-    echo "DEBUG: $@" >> ${DISCOVERY_LOG_FILE}
+    local T=$(date +"%Y-%m-%d_%H:%M:%S.%N")
+    echo "$T $$ (DEBUG) $@" >> ${STATS_LOG_FILE}
     [[ "${DEBUG_ONLY_LOG}" -ne 1 ]] || return
-    echo >&2 "DEBUG: $@"
+    echo >&2 "$T $$ (DEBUG) $@"
 }
 
 fail() {
@@ -51,19 +52,16 @@ then
 fi
 
 debug "DEBUG_ONLY_LOG         => $DEBUG_ONLY_LOG"
+debug "HAPROXY_SOCKET         => $HAPROXY_SOCKET"
 debug "DISCOVERY_LOG_FILE     => $DISCOVERY_LOG_FILE"
 debug "QUERYING_METHOD        => $QUERYING_METHOD"
 
-query_stats() {
-    if [[ ${QUERYING_METHOD} == "SOCKET" ]]; then
-        echo "show stat" | socat ${HAPROXY_SOCK} stdio 2>/dev/null
-    elif [[ ${QUERYING_METHOD} == "TCP" ]]; then
-        echo "show stat" | nc ${HAPROXY_STATS_IP//:/ } 2>/dev/null
-    fi
-}
-
 get_stats() {
-	echo "$(query_stats)" | grep -v "^#"
+    if [[ ${QUERYING_METHOD} == "SOCKET" ]]; then
+        echo "show stat" | socat ${HAPROXY_SOCKET} stdio 2>/dev/null | grep -v "^#"
+    elif [[ ${QUERYING_METHOD} == "TCP" ]]; then
+        echo "show stat" | nc ${HAPROXY_STATS_IP//:/ } 2>/dev/null | grep -v "^#"
+    fi
 }
 
 if [ -e "$HAPROXY_SOCKET" ]; then
@@ -75,18 +73,18 @@ else
 fi
 
 case $1 in
-	B*) END="BACKEND" ;;
-	F*) END="FRONTEND" ;;
-	S*)
-		for backend in $(get_stats | grep BACKEND | cut -d, -f1 | uniq); do
-			for server in $(get_stats | grep "^${backend}," | grep -v BACKEND | cut -d, -f2); do
-				serverlist="$serverlist,\n"'\t\t{\n\t\t\t"{#BACKEND_NAME}":"'$backend'",\n\t\t\t"{#SERVER_NAME}":"'$server'"}'
-			done
-		done
-		echo -e '{\n\t"data":[\n'${serverlist#,}']}'
-		exit 0
-	;;
-	*) fail 126 "ERROR: wrong resource type" ;;
+    B*) END="BACKEND" ;;
+    F*) END="FRONTEND" ;;
+    S*)
+        for backend in $(get_stats | grep BACKEND | cut -d, -f1 | uniq); do
+            for server in $(get_stats | grep "^${backend}," | grep -v BACKEND | cut -d, -f2); do
+                serverlist="$serverlist,\n"'\t\t{\n\t\t\t"{#BACKEND_NAME}":"'$backend'",\n\t\t\t"{#SERVER_NAME}":"'$server'"}'
+            done
+        done
+        echo -e '{\n\t"data":[\n'${serverlist#,}']}'
+        exit 0
+    ;;
+    *) fail 126 "ERROR: wrong resource type" ;;
 esac
 
 for frontend in $(get_stats | grep "$END" | cut -d, -f1 | uniq); do
