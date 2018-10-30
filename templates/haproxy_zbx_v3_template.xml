@@ -4276,6 +4276,53 @@ Some other errors are:
                             <application_prototypes/>
                         </item_prototype>
                         <item_prototype>
+                            <name>[{#FRONTEND_NAME}] calculated requests per minute</name>
+                            <type>15</type>
+                            <snmp_community/>
+                            <multiplier>0</multiplier>
+                            <snmp_oid/>
+                            <key>haproxy.stats[{#FRONTEND_NAME},FRONTEND,req_per_min]</key>
+                            <delay>60</delay>
+                            <history>60</history>
+                            <trends>365</trends>
+                            <status>0</status>
+                            <value_type>0</value_type>
+                            <allowed_hosts/>
+                            <units>req/min</units>
+                            <delta>0</delta>
+                            <snmpv3_contextname/>
+                            <snmpv3_securityname/>
+                            <snmpv3_securitylevel>0</snmpv3_securitylevel>
+                            <snmpv3_authprotocol>0</snmpv3_authprotocol>
+                            <snmpv3_authpassphrase/>
+                            <snmpv3_privprotocol>0</snmpv3_privprotocol>
+                            <snmpv3_privpassphrase/>
+                            <formula>1</formula>
+                            <delay_flex/>
+                            <params>60*last(&quot;haproxy.stats[{#FRONTEND_NAME},FRONTEND,req_tot]&quot;)</params>
+                            <ipmi_sensor/>
+                            <data_type>0</data_type>
+                            <authtype>0</authtype>
+                            <username/>
+                            <password/>
+                            <publickey/>
+                            <privatekey/>
+                            <port/>
+                            <description>number of HTTP requests received divided per number of second since last check, return average req/minute.</description>
+                            <inventory_link>0</inventory_link>
+                            <applications>
+                                <application>
+                                    <name>HAProxy</name>
+                                </application>
+                                <application>
+                                    <name>HAProxy Frontend</name>
+                                </application>
+                            </applications>
+                            <valuemap/>
+                            <logtimefmt/>
+                            <application_prototypes/>
+                        </item_prototype>
+                        <item_prototype>
                             <name>[{#FRONTEND_NAME}] request rate</name>
                             <type>0</type>
                             <snmp_community/>
@@ -5098,6 +5145,38 @@ Some other errors are:
                                     <item>
                                         <host>HAProxy</host>
                                         <key>haproxy.stats[{#FRONTEND_NAME},FRONTEND,req_rate]</key>
+                                    </item>
+                                </graph_item>
+                            </graph_items>
+                        </graph_prototype>
+                        <graph_prototype>
+                            <name>[{#FRONTEND_NAME}] calculated req/min</name>
+                            <width>900</width>
+                            <height>200</height>
+                            <yaxismin>0.0000</yaxismin>
+                            <yaxismax>100.0000</yaxismax>
+                            <show_work_period>1</show_work_period>
+                            <show_triggers>1</show_triggers>
+                            <type>0</type>
+                            <show_legend>1</show_legend>
+                            <show_3d>0</show_3d>
+                            <percent_left>0.0000</percent_left>
+                            <percent_right>0.0000</percent_right>
+                            <ymin_type_1>1</ymin_type_1>
+                            <ymax_type_1>0</ymax_type_1>
+                            <ymin_item_1>0</ymin_item_1>
+                            <ymax_item_1>0</ymax_item_1>
+                            <graph_items>
+                                <graph_item>
+                                    <sortorder>0</sortorder>
+                                    <drawtype>5</drawtype>
+                                    <color>00EE00</color>
+                                    <yaxisside>1</yaxisside>
+                                    <calc_fnc>2</calc_fnc>
+                                    <type>0</type>
+                                    <item>
+                                        <host>HAProxy</host>
+                                        <key>haproxy.stats[{#FRONTEND_NAME},FRONTEND,req_per_min]</key>
                                     </item>
                                 </graph_item>
                             </graph_items>
