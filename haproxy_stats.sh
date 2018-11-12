@@ -300,6 +300,7 @@ get_alljson () {
     _json_vals="${_json_vals} \"srvtot\":\"${_value}\""
 
     _json_vals=$(echo ${_json_vals} | sed 's/\s/,/g')
+    debug "RETURNED_VALUE: {\"haproxy_data\": {${_json_vals}}}"
     echo "{\"haproxy_data\": {${_json_vals}}}"
 }
 
