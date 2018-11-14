@@ -1,9 +1,53 @@
 #!/bin/bash
 set -o pipefail
 
-pxname="$1"
-svname="$2"
-stat="$3"
+debug() {
+    if [[ "${DEBUG}" -eq 1 ]]; then  # return immediately if debug is disabled
+        local T=$(date +"%Y-%m-%d_%H:%M:%S.%N")
+        echo "$T $$ (DEBUG) $@" >> ${STATS_LOG_FILE}
+        if [[ "${DEBUG_ONLY_LOG}" -ne 1 ]]; then
+            echo >&2 "$T $$ (DEBUG) $@"
+        fi
+    fi
+}
+
+fail() {
+    local _exit_code=${1:-1}
+    shift 1
+    if [[ -n "$1" ]]; then
+        if [[ "${DEBUG}" -eq 0 ]]; then
+            echo >&2 "$@"
+        else
+            debug "$@"
+        fi
+    fi
+    exit $_exit_code
+}
+
+f () {
+    errcode=$? # save the exit code as the first thing done in the trap function
+    echo "error $errorcode"
+    echo "the command executing at the time of the error was"
+    echo "$BASH_COMMAND"
+    echo "on line ${BASH_LINENO[0]}"
+    # do some error handling, cleanup, logging, notification
+    # $BASH_COMMAND contains the command that was being executed at the time of the trap
+    # ${BASH_LINENO[0]} contains the line number in the script of that command
+    # exit the script or return to try again, etc.
+    exit $errcode  # or use some other value or do return instead
+}
+trap f ERR
+
+metric_type="$1"
+[[ $metric_type != "stat" ]] && [[ $metric_type != "info" ]] && fail 128 "ERROR: Metric '$metric_type' NOT SUPPORTED"
+shift
+if [[ $metric_type == "stat" ]]; then
+    pxname="$1"
+    svname="$2"
+    stat="$3"
+else
+    stat="info"
+fi
 
 SCRIPT_DIR=`dirname $0`
 CONF_FILE="${SCRIPT_DIR}/haproxy_zbx.conf"
@@ -20,6 +64,7 @@ CACHE_INFO_FILEPATH="/var/tmp/haproxy_info.cache"  ## unused ATM
 CACHE_INFO_EXPIRATION=60  # in seconds ## unused ATM
 STATS_LOG_FILE="/var/tmp/haproxy_stat.log"
 GET_STATS=1  # when you update stats cache outsise of the script
+GET_INFO=1  # when you update info cache outsise of the script
 SOCAT_BIN="$(which socat)"
 FLOCK_BIN="$(which flock)"
 FLOCK_WAIT=15 # maximum number of seconds that "flock" waits for acquiring a lock
@@ -36,36 +81,26 @@ if [[ "$HAPROXY_STATS_IP" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[
     NC_BIN="$(which nc)"
 fi
 
-debug() {
-    [[ "${DEBUG}" -eq 1 ]] || return  # return immediately if debug is disabled
-    local T=$(date +"%Y-%m-%d_%H:%M:%S.%N")
-    echo "$T $$ (DEBUG) $@" >> ${STATS_LOG_FILE}
-    [[ "${DEBUG_ONLY_LOG}" -ne 1 ]] || return
-    echo >&2 "$T $$ (DEBUG) $@"
-}
-
-fail() {
-    local _exit_code=${1:-1}
-    shift 1
-    if [[ -n "$1" ]]; then
-        if [[ "${DEBUG}" -eq 0 ]]; then
-            echo >&2 "$@"
-        else
-            debug "$@"
-        fi
-    fi
-  exit $_exit_code
-}
+if [[ $metric_type == "stat" ]]; then
+    CACHE_FILEPATH=$CACHE_STATS_FILEPATH
+    CACHE_EXPIRATION=$CACHE_STATS_EXPIRATION
+    GET_TYPE=$GET_STATS
+else
+    CACHE_FILEPATH=$CACHE_INFO_FILEPATH
+    CACHE_EXPIRATION=$CACHE_INFO_EXPIRATION
+    GET_TYPE=$GET_INFO
+fi
 
 debug "DEBUG_ONLY_LOG         => $DEBUG_ONLY_LOG"
 debug "STATS_LOG_FILE         => $STATS_LOG_FILE"
 debug "SOCAT_BIN              => $SOCAT_BIN"
 debug "NC_BIN                 => $NC_BIN"
-debug "CACHE_STATS_FILEPATH   => $CACHE_STATS_FILEPATH"
-debug "CACHE_STATS_EXPIRATION => $CACHE_STATS_EXPIRATION seconds"
+debug "metric_type            => $metric_type"
+debug "CACHE_FILEPATH         => $CACHE_FILEPATH"
+debug "CACHE_EXPIRATION       => $CACHE_EXPIRATION seconds"
 debug "HAPROXY_SOCKET         => $HAPROXY_SOCKET"
-debug "pxname   => $pxname"
-debug "svname   => $svname"
+debug "pxname   => ${pxname:-(NOT NEEDED FOR INFO)}"
+debug "svname   => ${svname:-(NOT NEEDED FOR INFO)}"
 debug "stat     => $stat"
 
 # check if socat is available in path
@@ -74,39 +109,42 @@ then
   fail 126 'ERROR: cannot find socat binary'
 fi
 
-# if we are getting stats:
-#   check if we can write to stats cache file, if it exists
-#     or cache file path, if it does not exist
-#   check if HAPROXY socket is writable
-# if we are NOT getting stats:
-#   check if we can read the stats cache file
-if [ "$GET_STATS" -eq 1 ]; then
-    if [ -e "$HAPROXY_SOCKET" ]; then
-        if [ ! -r "$HAPROXY_SOCKET" ]; then
-            fail 126 'ERROR: cannot read socket file'
-        fi
-    else
-        fail 126 "ERROR: HAProxy Socket file ($HAPROXY_SOCKET) doesn't exists"
-    fi
+# check cache files
 
-    if [ -e "$CACHE_STATS_FILEPATH" ]; then
-        if [ ! -w "$CACHE_STATS_FILEPATH" ]; then
-            fail 126 'ERROR: stats cache file exists, but is not writable'
-        elif [ ! -s "$CACHE_STATS_FILEPATH" ]; then
-            debug "ERROR: stats cache file exists, but it's empty -> destroying it!"
-            rm -f "$CACHE_STATS_FILEPATH"
-            if [ $? -ne 0 ]; then
-                fail 126 "ERROR: problems deleting cache file, please check permissions!"
+check_cache(){
+    # if we are getting stats:
+    #   check if we can write to cache file, if it exists
+    #     or cache file path, if it does not exist
+    #   check if HAPROXY socket is writable
+    # if we are NOT getting stats:
+    #   check if we can read the stats cache file
+    if [ "$GET_TYPE" -eq 1 ]; then
+        if [ -e "$HAPROXY_SOCKET" ]; then
+            if [ ! -r "$HAPROXY_SOCKET" ]; then
+                fail 126 'ERROR: cannot read socket file'
+            fi
+        else
+            fail 126 "ERROR: HAProxy Socket file ($HAPROXY_SOCKET) doesn't exists"
+        fi
+
+        if [ -e "$CACHE_FILEPATH" ]; then
+            if [ ! -w "$CACHE_FILEPATH" ]; then
+                fail 126 "ERROR: $metric_type cache file exists, but is not writable"
+            elif [ ! -s "$CACHE_FILEPATH" ]; then
+                debug "ERROR: $metric_type cache file exists, but it's empty -> destroying it!"
+                rm -f "$CACHE_FILEPATH"
+                if [ $? -ne 0 ]; then
+                    fail 126 "ERROR: problems deleting $metric_type cache file, please check permissions!"
+                fi
             fi
         fi
+        if [[ $QUERYING_METHOD == "SOCKET" && ! -w $HAPROXY_SOCKET ]]; then
+            fail 126 "ERROR: haproxy socket is not writable"
+        fi
+    elif [ ! -r "$CACHE_FILEPATH" ]; then
+        fail 126 "ERROR: cannot read $metric_type cache file"
     fi
-    if [[ $QUERYING_METHOD == "SOCKET" && ! -w $HAPROXY_SOCKET ]]; then
-        fail 126 "ERROR: haproxy socket is not writable"
-    fi
-elif [ ! -r "$CACHE_STATS_FILEPATH" ]; then
-    fail 126 'ERROR: cannot read stats cache file'
-fi
-
+}
 
 # index:name:default
 MAP="
@@ -172,8 +210,9 @@ MAP="
 60:ctime:0
 61:rtime:0
 62:ttime:0
-0:srvtot:0
-0:alljson:0
+0:srvtot:CUSTOM
+0:alljson:CUSTOM
+0:info:CUSTOM
 "
 
 _STAT=$(echo -e "$MAP" | grep :${stat}:)
@@ -204,29 +243,19 @@ query_stats() {
 # a generic cache management function, that relies on 'flock'
 cache_gen() {
     local cache_filemtime
-    local cache_filepath
-    local cache_expiration
-    local cache_type=$1
-    debug "cache_type => $cache_type"
-    if [[ ${cache_type} == "stat" ]]; then
-        cache_filepath=$CACHE_STATS_FILEPATH
-        cache_expiration=$CACHE_STATS_EXPIRATION
-    else
-        cache_filepath=$CACHE_INFO_FILEPATH
-        cache_expiration=$CACHE_INFO_EXPIRATION
-    fi
-    cache_filemtime=$(stat -c '%Y' "${cache_filepath}" 2> /dev/null)
-    if [[ $((cache_filemtime+cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
-        debug "${cache_type} file found, results are at most ${cache_expiration} seconds stale..."
+    cache_filemtime=$(stat -c '%Y' "${CACHE_FILEPATH}" 2> /dev/null)
+    if [[ $((cache_filemtime+CACHE_EXPIRATION)) -ge ${CUR_TIMESTAMP} && -s "${CACHE_FILEPATH}" ]]; then
+        debug "${metric_type} file found, results are at most ${CACHE_EXPIRATION} seconds stale..."
     elif "${FLOCK_BIN}" --exclusive --wait "${FLOCK_WAIT}" 200; then
-        cache_filemtime=$(stat -c '%Y' "${cache_filepath}" 2> /dev/null)
-        if [[ $((cache_filemtime+cache_expiration)) -ge ${CUR_TIMESTAMP} && -s "${cache_filepath}" ]]; then
-            debug "${cache_type} file found, results have just been updated by another process..."
+        cache_filemtime=$(stat -c '%Y' "${CACHE_FILEPATH}" 2> /dev/null)
+        if [[ $((cache_filemtime+CACHE_EXPIRATION)) -ge ${CUR_TIMESTAMP} && -s "${CACHE_FILEPATH}" ]]; then
+            debug "$(ls -al $CACHE_FILEPATH)"
+            debug "${metric_type} file found, results have just been updated by another process..."
         else
-            debug "${cache_type} file expired/empty/not_found, querying haproxy to refresh it"
-            query_stats "show ${cache_type}" > "${cache_filepath}"
+            debug "${metric_type} file expired/empty/not_found, querying haproxy to refresh it"
+            query_stats "show ${metric_type}" > "${CACHE_FILEPATH}"
         fi
-    fi 200> "${cache_filepath}${FLOCK_SUFFIX}"
+    fi 200> "${CACHE_FILEPATH}${FLOCK_SUFFIX}"
 }
 
 get_resources() {
@@ -234,9 +263,9 @@ get_resources() {
     # $2: [OPTIONAL] file where to save resource extracted. (useful if multiple resources
     #     are returned because else the ${_res} var will be a single line)
     if [ -z $2 ]; then
-        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}")"
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_FILEPATH}")"
     else
-        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_STATS_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_STATS_FILEPATH}" | tee $2)"
+        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_FILEPATH}" | tee $2)"
     fi
     [[ -z ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
     debug "full_line resource stats: "${_res}
@@ -304,8 +333,13 @@ get_alljson () {
     echo "{\"haproxy_data\": {${_json_vals}}}"
 }
 
-# get_stats
-cache_gen stat
+get_info(){
+    echo "GET_INFO"
+}
+
+check_cache
+cache_gen
+
 
 # this allows for overriding default method of getting stats
 # name a function by stat name for additional processing, custom returns, etc.
