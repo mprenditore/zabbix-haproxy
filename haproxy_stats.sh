@@ -15,28 +15,15 @@ fail() {
     local _exit_code=${1:-1}
     shift 1
     if [[ -n "$1" ]]; then
-        if [[ "${DEBUG}" -eq 0 ]]; then
-            echo >&2 "$@"
-        else
+        if [[ "${DEBUG}" -eq 1 ]]; then
             debug "$@"
         fi
+        echo >&2 "$@"
     fi
+    rm -f ${TMPFILE} ${RESTTMPFILE}
     exit $_exit_code
 }
 
-f () {
-    errcode=$? # save the exit code as the first thing done in the trap function
-    echo "error $errorcode"
-    echo "the command executing at the time of the error was"
-    echo "$BASH_COMMAND"
-    echo "on line ${BASH_LINENO[0]}"
-    # do some error handling, cleanup, logging, notification
-    # $BASH_COMMAND contains the command that was being executed at the time of the trap
-    # ${BASH_LINENO[0]} contains the line number in the script of that command
-    # exit the script or return to try again, etc.
-    exit $errcode  # or use some other value or do return instead
-}
-trap f ERR
 
 metric_type="$1"
 [[ $metric_type != "stat" ]] && [[ $metric_type != "info" ]] && fail 128 "ERROR: Metric '$metric_type' NOT SUPPORTED"
@@ -70,6 +57,9 @@ FLOCK_BIN="$(which flock)"
 FLOCK_WAIT=15 # maximum number of seconds that "flock" waits for acquiring a lock
 FLOCK_SUFFIX='.lock'
 CUR_TIMESTAMP="$(date '+%s')"
+
+TMPFILE=`mktemp`
+RESTTMPFILE=`mktemp`
 
 # constants override
 if [ -f ${CONF_FILE} ]; then
@@ -276,17 +266,19 @@ get_resources() {
 # return default value if stat is ""
 get() {
     # $1: pxname/svname
-    local _res=$(get_resources "$1")
+    local restmpfile=`mktemp`
+    get_resources "$1" ${RESTTMPFILE} > /dev/null
+    local _res=$(cat ${RESTTMPFILE})
     _res="$(echo $_res | cut -d, -f ${_INDEX})"
     if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
-        echo "${_DEFAULT}"  
         debug "return value (default) = ${_DEFAULT}"
+        echo "${_DEFAULT}"  
     elif [ "${_res}" == "-1" ]; then 
-        echo "0" 
         debug "return value (-1) = 0"
+        echo "0" 
     else 
-        echo "${_res}" 
         debug "return value (_res) = ${_res}"
+        echo "${_res}" 
     fi
 }
 
@@ -294,23 +286,22 @@ get() {
 # this is needed to check the number of server there should be "UP"
 get_srvtot () {
     local _srvtot=0
-    local tmpfile=`mktemp`
-    local restmpfile=`mktemp`
-    get_resources "$1" ${restmpfile} > /dev/null
-    $(cat ${restmpfile} | grep -v "BACKEND" | grep -v "FRONTEND" > ${tmpfile})
+    get_resources "$1" ${RESTTMPFILE} > /dev/null
+    $(cat ${RESTTMPFILE} | grep -v "BACKEND" | grep -v "FRONTEND" > ${TMPFILE})
     while read line; do
         debug "LINE: $line"
         if [[ "$(echo \"${line}\" | cut -d, -f 20 )" -eq "1" ]]; then
             _srvtot=$((_srvtot+1))
         fi
-    done < ${tmpfile}
-    rm -f ${tmpfile} ${restmpfile}
+    done < ${TMPFILE}
     echo "${_srvtot}"
 }
 
 get_alljson () {
     local _pxname=$( echo ${1%%,*} | sed 's/\^//g')
-    local _res=$(get_resources "$1")
+    get_resources "$1" ${RESTTMPFILE} > /dev/null
+    local _res=$(cat ${RESTTMPFILE})
+    debug "DEBUG: exitcode in alljson get_resources = $?" 
     local _json_vals
     local _stat
     local _key
@@ -361,3 +352,4 @@ else
     debug "using default get() method"
     get "^${pxname},${svname},"
 fi
+rm -f ${TMPFILE} ${RESTTMPFILE}
