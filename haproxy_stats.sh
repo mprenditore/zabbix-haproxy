@@ -33,7 +33,7 @@ if [[ $metric_type == "stat" ]]; then
     svname="$2"
     stat="$3"
 else
-    stat="info"
+    stat=$1
 fi
 
 SCRIPT_DIR=`dirname $0`
@@ -137,7 +137,7 @@ check_cache(){
 }
 
 # index:name:default
-MAP="
+STATS_MAP="
 1:pxname:@
 2:svname:@
 3:qcur:9999999999
@@ -202,16 +202,73 @@ MAP="
 62:ttime:0
 0:srvtot:CUSTOM
 0:alljson:CUSTOM
-0:info:CUSTOM
 "
 
-_STAT=$(echo -e "$MAP" | grep :${stat}:)
-_INDEX=${_STAT%%:*}
-_DEFAULT=${_STAT##*:}
-
-debug "_STAT    => $_STAT"
-debug "_INDEX   => $_INDEX"
-debug "_DEFAULT => $_DEFAULT"
+INFO_MAP="
+Name
+Version
+Release_date
+Nbthread
+Nbproc
+Process_num
+Pid
+Uptime
+Uptime_sec
+Memmax_MB
+PoolAlloc_MB
+PoolUsed_MB
+PoolFailed
+Ulimit-n
+Maxsock
+Maxconn
+Hard_maxconn
+CurrConns
+CumConns
+CumReq
+MaxSslConns
+CurrSslConns
+CumSslConns
+Maxpipes
+PipesUsed
+PipesFree
+ConnRate
+ConnRateLimit
+MaxConnRate
+SessRate
+SessRateLimit
+MaxSessRate
+SslRate
+SslRateLimit
+MaxSslRate
+SslFrontendKeyRate
+SslFrontendMaxKeyRate
+SslFrontendSessionReuse_pct
+SslBackendKeyRate
+SslBackendMaxKeyRate
+SslCacheLookups
+SslCacheMisses
+CompressBpsIn
+CompressBpsOut
+CompressBpsRateLim
+ZlibMemUsage
+MaxZlibMemUsage
+Tasks
+Run_queue
+Idle_pct
+node
+info_alljson
+"
+if [[ $metric_type == "stat" ]]; then
+    _STAT=$(echo -e "$STATS_MAP" | grep :${stat}:)
+    _INDEX=${_STAT%%:*}
+    _DEFAULT=${_STAT##*:}
+    debug "_STAT    => $_STAT"
+    debug "_INDEX   => $_INDEX"
+    debug "_DEFAULT => $_DEFAULT"
+else
+    _STAT=$(echo -e "$INFO_MAP" | grep ${stat})
+    debug "_STAT    => $_STAT"
+fi
 
 # check if requested stat is supported
 if [ -z "${_STAT}" ]
@@ -252,44 +309,58 @@ get_resources() {
     # $1: string to search for
     # $2: [OPTIONAL] file where to save resource extracted. (useful if multiple resources
     #     are returned because else the ${_res} var will be a single line)
-    if [ -z $2 ]; then
-        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_FILEPATH}")"
+    local _res
+    local _flock_parsing
+    local error_message
+    # using different  error message "stat" and "info"
+    if [[ $metric_type == "stat" ]]; then
+        _error_message="ERROR: bad $pxname/$svname"
     else
-        local _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_FILEPATH}" | tee $2)"
+        _error_message="ERROR: info stat is unsupported"
     fi
-    [[ -z ${_res} ]] && fail 127 "ERROR: bad $pxname/$svname"
-    debug "full_line resource stats: "${_res}
-    echo ${_res}
+    # extract resources from flocked cache file
+    if [[ -z $2 ]]; then
+        _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_FILEPATH}" | grep -v ^$)"
+    else
+        _res="$("${FLOCK_BIN}" --shared --wait "${FLOCK_WAIT}" "${CACHE_FILEPATH}${FLOCK_SUFFIX}" grep "$1" "${CACHE_FILEPATH}" | grep -v ^$ | tee "$2")"
+    fi
+    [[ -z ${_res} ]] && fail 127 "${_error_message}"  # fail if no resource is found
+    debug "full_line resource stats: ${_res}"
+    [[ -z $2 ]] && echo ${_res}
 }
 
-# get requested stat from cache file using INDEX offset defined in MAP
+# get requested stat from cache file using INDEX offset defined in STATS_MAP
 # return default value if stat is ""
 get() {
-    # $1: pxname/svname
-    local restmpfile=`mktemp`
-    get_resources "$1" ${RESTTMPFILE} > /dev/null
-    local _res=$(cat ${RESTTMPFILE})
-    _res="$(echo $_res | cut -d, -f ${_INDEX})"
-    if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
-        debug "return value (default) = ${_DEFAULT}"
-        echo "${_DEFAULT}"  
-    elif [ "${_res}" == "-1" ]; then 
-        debug "return value (-1) = 0"
-        echo "0" 
-    else 
-        debug "return value (_res) = ${_res}"
-        echo "${_res}" 
+    # $1: pxname/svname for "stat"; stat for "info"
+    local _res
+    local _ret_type="_res"
+    get_resources "$1" ${RESTTMPFILE}
+    if [[ $metric_type == "info" ]]; then
+        _res=$(cat ${RESTTMPFILE} | cut -d: -f2 | tr -d '[:space:]')
+    else
+        _res="$(cat $RESTTMPFILE | cut -d, -f ${_INDEX})"
+        # TODO: find out what to return if default is "@"
+        if [ -z "${_res}" ] && [[ "${_DEFAULT}" != "@" ]]; then
+            _ret_type="default"
+            _res="${_DEFAULT}"
+        elif [ "${_res}" == "-1" ]; then 
+            _ret_type="default"
+            _res="0"
+        fi
     fi
+    debug "return value ($_ret_type) = ${_res}"
+    echo "${_res}"
 }
 
 # get number of total servers in "active" mode
 # this is needed to check the number of server there should be "UP"
 get_srvtot () {
     local _srvtot=0
-    get_resources "$1" ${RESTTMPFILE} > /dev/null
+    get_resources "$1" ${RESTTMPFILE}
     $(cat ${RESTTMPFILE} | grep -v "BACKEND" | grep -v "FRONTEND" > ${TMPFILE})
     while read line; do
-        debug "LINE: $line"
+        debug "LINE: ${line}"
         if [[ "$(echo \"${line}\" | cut -d, -f 20 )" -eq "1" ]]; then
             _srvtot=$((_srvtot+1))
         fi
@@ -297,35 +368,48 @@ get_srvtot () {
     echo "${_srvtot}"
 }
 
+render_final_json(){
+    local _json_vals=$(echo ${1} | sed "s/\s/,/g")
+    debug "RETURNED_VALUE: {\"haproxy_data\": {${_json_vals}}}"
+    echo "{\"haproxy_data\": {${_json_vals}}}"
+}
+
 get_alljson () {
     local _pxname=$( echo ${1%%,*} | sed 's/\^//g')
-    get_resources "$1" ${RESTTMPFILE} > /dev/null
+    get_resources "$1" ${RESTTMPFILE}
     local _res=$(cat ${RESTTMPFILE})
-    debug "DEBUG: exitcode in alljson get_resources = $?" 
     local _json_vals
     local _stat
     local _key
     local _value
     local _index
-    for s in $MAP; do
+    for s in $STATS_MAP; do
         _index=${s%%:*}
         [[ ${_index} -eq 0 ]] && continue
         _stat_val=${s#*:}
         _key=${_stat_val%:*}
         _value=$(echo $_res | cut -d, -f${_index})
-        [[ -z "${_value}" ]] && _value=${_stat_val#*:}  # if empty value set it to Default val from MAP
+        [[ -z "${_value}" ]] && _value=${_stat_val#*:}  # if empty value set it to Default val from STATS_MAP
             _json_vals="${_json_vals} \"${_key}\":\"${_value}\""
     done
     _value=$(get_srvtot "^${_pxname},")
     _json_vals="${_json_vals} \"srvtot\":\"${_value}\""
 
-    _json_vals=$(echo ${_json_vals} | sed 's/\s/,/g')
-    debug "RETURNED_VALUE: {\"haproxy_data\": {${_json_vals}}}"
-    echo "{\"haproxy_data\": {${_json_vals}}}"
+    render_final_json "${_json_vals}" "\s"
 }
 
-get_info(){
-    echo "GET_INFO"
+get_info_alljson(){
+    get_resources "" ${RESTTMPFILE} > /dev/null
+    local _json_vals
+    local _key
+    local _value
+    while read line; do
+        debug "LINE: ${line}"
+        _key="${line%:*}"
+        _value="$(echo ${line#*:} | tr -d '[:space:]')"
+        _json_vals="${_json_vals} \"${_key}\":\"${_value}\""
+    done < ${RESTTMPFILE}
+    render_final_json "${_json_vals}"
 }
 
 check_cache
@@ -350,6 +434,10 @@ then
     esac
 else
     debug "using default get() method"
-    get "^${pxname},${svname},"
+    if [[ $metric_type == "stat" ]]; then
+        get "^${pxname},${svname},"
+    else
+        get "${stat}"
+    fi
 fi
 rm -f ${TMPFILE} ${RESTTMPFILE}
