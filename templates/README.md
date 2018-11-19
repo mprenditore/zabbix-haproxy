@@ -16,6 +16,7 @@ This template is for **Zabbix 3.4** (and later).
 It takes advantage of the *Dependent Items* feature of Zabbix 3.4 to reduce the stress on the agent
 retriving a full json for each discovered item and let Zabbix to parse it to get single metrics.
 *This can help reducing the number of request to the agent by a factor of  about* ***30 times***.
+It includes also the INFO stats for info of the whole HAProxy server.
 It has a default set of items already enbled by default but most of them are disabled.
 This is meant as a starting point so you can decide which are the important ones for you.
 
