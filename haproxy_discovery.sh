@@ -20,6 +20,8 @@ DEBUG_ONLY_LOG=1
 DISCOVERY_LOG_FILE="/var/tmp/haproxy_discovery.log"
 QUERYING_METHOD="SOCKET"
 
+TMPFILE=`mktemp`
+
 # constants override
 if [ -f ${CONF_FILE} ]; then
     source ${CONF_FILE}
@@ -43,6 +45,7 @@ fail() {
             debug "$@"
         fi
     fi
+  rm -f ${TMPFILE}
   exit $_exit_code
 }
 
@@ -72,22 +75,30 @@ else
     fail 126 "ERROR: HAProxy Socket file ($HAPROXY_SOCKET) doesn't exists"
 fi
 
+get_stats > ${TMPFILE}
+
+# list all listeners to be filtered out, else the Server Discovery will have errors to create items because of 
+# duplicate keys
+listeners=$(grep "FRONTEND\|BACKEND" ${TMPFILE} | cut -d, -f1 | sort | uniq -c | sort -n | egrep " +2" | awk '{print $2}' | xargs | sed 's/ /|/g')
+
 case $1 in
     B*) END="BACKEND" ;;
     F*) END="FRONTEND" ;;
     S*)
-        for backend in $(get_stats | grep BACKEND | cut -d, -f1 | uniq); do
+        for backend in $(grep BACKEND ${TMPFILE} | egrep -v "$listeners" | cut -d, -f1 | uniq); do
             for server in $(get_stats | grep "^${backend}," | grep -v BACKEND | cut -d, -f2); do
                 serverlist="$serverlist,\n"'\t\t{\n\t\t\t"{#BACKEND_NAME}":"'$backend'",\n\t\t\t"{#SERVER_NAME}":"'$server'"}'
             done
         done
+	    rm -f ${TMPFILE}
         echo -e '{\n\t"data":[\n'${serverlist#,}']}'
         exit 0
     ;;
     *) fail 126 "ERROR: wrong resource type" ;;
 esac
 
-for frontend in $(get_stats | grep "$END" | cut -d, -f1 | uniq); do
+for frontend in $(grep "$END" ${TMPFILE} | egrep -v "$listeners" | cut -d, -f1 | uniq); do
     felist="$felist,\n"'\t\t{\n\t\t\t"{#'${END}'_NAME}":"'$frontend'"}'
 done
+rm -f ${TMPFILE}
 echo -e '{\n\t"data":[\n'${felist#,}']}'
